@@ -189,18 +189,18 @@ $(function() {
                 } else {
                     presentFeedback($feedback, feedbackTempl, app.world, "Challenge failed", "Maybe your program needs an improvement?", "");
                 }
-                if (autoStart && app.agent.playing()) {
-                    app.agent.train(()=> app.startChallenge(challengeIndex, autoStart));
-                }
             }
         });
 
         var codeObj = editor.getCodeObj();
         console.log("Starting...");
         app.worldController.start(app.world, codeObj, window.requestAnimationFrame, autoStart);
-        if (app.agent) {
-            app.agent.play(app.world);
-        }
+        if(!app.agent) return;
+        app.agent.play(app.world, 0.7).then(async memory => {
+            await app.agent.train(memory);
+            if (!autoStart) return;
+            app.startChallenge(challengeIndex, autoStart)
+        });
     };
 
     editor.on("apply_code", function() {
