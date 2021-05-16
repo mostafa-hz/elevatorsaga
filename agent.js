@@ -50,8 +50,8 @@ const createAgent = function (options) {
         return envState;
     }
 
-    function calculateReward(world, oldWorld) {
-        const state = observe(world);
+    function calculateReward(world, oldWorld, observation, oldObservation) {
+        // TODO Fix For Multiple elevators
         const {
             elapsedTime,
             transportedPerSec,
@@ -74,20 +74,27 @@ const createAgent = function (options) {
 
         let buttonsPressed = 0;
         for (let i = 0; i < floorCount; i++) {
-            buttonsPressed += state[`fUpPressed${i}`];
-            buttonsPressed += state[`fDownPressed${i}`];
+            buttonsPressed += observation[`fUpPressed${i}`];
+            buttonsPressed += observation[`fDownPressed${i}`];
         }
-        const floorsReward = buttonsPressed * timeDelta;
+        const floorsPressed = buttonsPressed * timeDelta;
 
         let loadAvg = 0;
-        let notMovingReward = 0;
+        let oldLoadAvg = 0;
+        let notMoving = 0;
+        let changeDirection = 0;
         for (let i = 0; i < elevatorCount; i++) {
-            loadAvg += state[`eLoadFactor${i}`];
-            const direction = state[`eDestinationDirection${i}`];
+            loadAvg += observation[`eLoadFactor${i}`];
+            oldLoadAvg += oldObservation[`eLoadFactor${i}`];
+            const oldDirection = oldObservation[`eDestinationDirection${i}`];
+            const direction = observation[`eDestinationDirection${i}`];
+            if (oldDirection !== direction) {
+                changeDirection = 1
+            }
             if (direction === 0) {
                 for (let j = 0; j < floorCount; j++) {
-                    if (state[`ePressedFloor${i}${j}`] === 1) {
-                        notMovingReward = 1;
+                    if (observation[`ePressedFloor${i}${j}`] === 1) {
+                        notMoving = 1;
                         break;
                     }
                 }
@@ -95,15 +102,15 @@ const createAgent = function (options) {
 
         }
         loadAvg /= elevatorCount;
+        oldLoadAvg /= elevatorCount;
 
-        const transported = transportedCounter - transportedCounterOld;
-        const moved = moveCount - moveCountOld;
+        const transported = Math.abs(loadAvg - oldLoadAvg);
 
         let reward = 0;
-        reward += (transported * 10);
-        reward += ((moved * loadAvg) * -1);
-        reward += floorsReward * -2;
-        reward += notMovingReward * -20;
+        reward += (transported * 50);
+        reward += ((changeDirection * loadAvg) * -20);
+        reward += floorsPressed * -1;
+        reward += notMoving * -50;
 
         return reward;
     }
@@ -133,8 +140,11 @@ const createAgent = function (options) {
         return possibleActions[maxRewardIndex]
     }
 
+    let preRandomIndex = 0;
+
     function getRandomAction() {
-        const randomIndex = Math.floor(Math.random() * possibleActions.length);
+        const randomIndex = Math.random() > 0.5 ? Math.floor(Math.random() * possibleActions.length) : preRandomIndex;
+        preRandomIndex = randomIndex;
         return possibleActions[randomIndex]
     }
 
@@ -165,24 +175,31 @@ const createAgent = function (options) {
                 rewards: [],
             };
 
-            async function takeAction(world, action) {
-                const oldWorld = {...world};
+            let cb = undefined;
 
+            let oldWorld = {...world};
+            world.on('stats_changed', function () {
+                if (cb == null) return;
+                const observation = observe(world);
+                const oldObservation = memory.observations[memory.observations.length - 1] || {};
+                if (
+                    !world.challengeEnded &&
+                    world.elapsedTime - 0.5 < oldWorld.elapsedTime && // prevent stuck in an state for exploration
+                    String(Object.values(observation)) === String(Object.values(oldObservation))
+                ) return;
+                world.off('stats_changed', this);
+                const reward = calculateReward(world, oldWorld, observation, oldObservation);
+                cb(reward);
+                oldWorld = {...world};
+                cb = undefined;
+            });
+
+            async function takeAction(world, action) {
                 const elevators = world.elevatorInterfaces;
                 elevators.forEach((elevator, i) => elevator.goToFloor(action[i], true));
 
                 return new Promise((resolve => {
-                    world.on('stats_changed', function () {
-                        const observation = observe(world);
-                        const oldObservation = memory.observations[memory.observations.length - 1] || {};
-                        if (
-                            !world.challengeEnded &&
-                            String(Object.values(observation)) === String(Object.values(oldObservation))
-                        ) return;
-                        world.off('stats_changed', this);
-                        const reward = calculateReward(world, oldWorld);
-                        resolve(reward);
-                    });
+                    cb = resolve
                 }));
             }
 

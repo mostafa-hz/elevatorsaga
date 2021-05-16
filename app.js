@@ -149,6 +149,7 @@ $(function() {
     app.worldCreator = createWorldCreator();
     app.world = undefined;
     app.agent = undefined;
+    app.exploreRate = 0.9;
 
     app.currentChallengeIndex = 0;
 
@@ -196,15 +197,17 @@ $(function() {
         console.log("Starting...");
         app.worldController.start(app.world, codeObj, window.requestAnimationFrame, autoStart);
         if(!app.agent) return;
-        app.agent.play(app.world, 0.7).then(async memory => {
+        app.agent.play(app.world, app.exploreRate).then(async memory => {
             await app.agent.train(memory);
             if (!autoStart) return;
+            app.exploreRate -= 0.00001;
             app.startChallenge(challengeIndex, autoStart)
         });
     };
 
     editor.on("apply_code", function() {
         app.agent = createAgent(challenges[app.currentChallengeIndex].options, true);
+        app.exploreRate = 0.9;
         app.startChallenge(app.currentChallengeIndex, true);
     });
     editor.on("code_success", function() {
