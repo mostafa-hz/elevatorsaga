@@ -184,7 +184,7 @@ var createWorldCreator = function() {
                     users.splice(i, 1);
                 }
             }
-            
+
             recalculateStats();
         };
 
@@ -213,6 +213,79 @@ var createWorldCreator = function() {
                 world.elevatorInterfaces[i].checkDestinationQueue();
             }
         };
+
+        function calculateReward (world, oldWorld) {
+            // TODO Fix For Multiple elevators
+            const {
+                elapsedTime,
+                transportedPerSec,
+                maxWaitTime,
+                avgWaitTime,
+                moveCount,
+                transportedCounter,
+            } = world;
+
+            const {
+                elapsedTime: elapsedTimeOld,
+                transportedPerSec: transportedPerSecOld,
+                maxWaitTime: maxWaitTimeOld,
+                avgWaitTime: avgWaitTimeOld,
+                moveCount: moveCountOld,
+                transportedCounter: transportedCounterOld,
+            } = oldWorld;
+
+            let pressedButtons = 0;
+            world.floors.forEach(floor => {
+                pressedButtons += Number(floor.buttonStates.up === 'activated');
+                pressedButtons += Number(floor.buttonStates.down === 'activated');
+            });
+
+            let reward = 0;
+            const moves = moveCount - moveCountOld;
+            const transports = transportedCounter - transportedCounterOld;
+            const hasTransport = transports > 0;
+
+            reward += (moves * -2);
+            reward += (pressedButtons * -2);
+            reward += (hasTransport * 50);
+
+            return reward;
+        }
+
+        let cb = undefined;
+
+        let oldWorld = {...world};
+        world.on('stats_changed', function () {
+            if (cb == null) return;
+
+            const idleElevator = world.elevatorInterfaces.find(elevator => elevator.destinationQueue.length === 0);
+
+            if (!world.challengeEnded && !idleElevator) return;
+
+            const reward = calculateReward(world, oldWorld);
+            cb(reward);
+            oldWorld = {...world};
+            cb = undefined;
+        });
+
+        world.takeAction = async function (world, action) {
+            const elevators = world.elevatorInterfaces;
+            elevators.forEach((elevator, i) => elevator.goToFloor(action[i], true));
+
+            return new Promise((resolve => {
+                cb = resolve
+            }));
+        };
+
+        // TODO fix for multiple elevators
+        world.possibleActions = [];
+        for (let i = 0; i < options.floorCount ** options.elevatorCount; i++) {
+            let action = [];
+            for (let j = 0; j < options.elevatorCount; j++) {
+                action.push(i)
+            }
+            world.possibleActions.push(action);
+        }
 
         return world;
     };
