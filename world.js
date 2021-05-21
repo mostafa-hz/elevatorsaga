@@ -217,6 +217,7 @@ var createWorldCreator = function() {
         let oldWorld = {
             moveCount: 0,
             transportedCounter: 0,
+            loadFactor: 0,
         };
         function calculateReward (world) {
             // TODO Fix For Multiple elevators
@@ -232,6 +233,7 @@ var createWorldCreator = function() {
             const {
                 moveCount: moveCountOld,
                 transportedCounter: transportedCounterOld,
+                loadFactor: loadFactorOld,
             } = oldWorld;
 
             let pressedButtons = 0;
@@ -240,18 +242,32 @@ var createWorldCreator = function() {
                 pressedButtons += Number(floor.buttonStates.down === 'activated');
             });
 
+            let loadFactor = 0;
+            world.elevatorInterfaces.forEach((elevator, i) => {
+                loadFactor += elevator.loadFactor();
+            });
+
             let reward = 0;
             const moves = moveCount - moveCountOld;
             const transports = transportedCounter - transportedCounterOld;
             const hasTransport = transports > 0;
 
-            reward += (moves * -2);
+            const loadUser = loadFactor > loadFactorOld;
+
+            reward += (moves * (loadFactor + 1) * -4);
             reward += (pressedButtons * -2);
             reward += (hasTransport * 50);
+            reward += (loadUser * 10);
+
+            if (!loadUser && !hasTransport && (pressedButtons > 0 || loadFactor > 0)){
+                reward += -200
+            }
+
 
             oldWorld = {
                 moveCount,
                 transportedCounter,
+                loadFactor,
             };
 
             return reward;
