@@ -203,7 +203,7 @@ var createWorldCreator = function() {
             _.each(world.elevators.concat(world.elevatorInterfaces).concat(world.users).concat(world.floors).concat([world]), function(obj) {
                 obj.off("*");
             });
-            world.challengeEnded = true;
+            world.endChallenge();
             world.elevators = world.elevatorInterfaces = world.users = world.floors = [];
         };
 
@@ -214,7 +214,11 @@ var createWorldCreator = function() {
             }
         };
 
-        function calculateReward (world, oldWorld) {
+        let oldWorld = {
+            moveCount: 0,
+            transportedCounter: 0,
+        };
+        function calculateReward (world) {
             // TODO Fix For Multiple elevators
             const {
                 elapsedTime,
@@ -226,10 +230,6 @@ var createWorldCreator = function() {
             } = world;
 
             const {
-                elapsedTime: elapsedTimeOld,
-                transportedPerSec: transportedPerSecOld,
-                maxWaitTime: maxWaitTimeOld,
-                avgWaitTime: avgWaitTimeOld,
                 moveCount: moveCountOld,
                 transportedCounter: transportedCounterOld,
             } = oldWorld;
@@ -249,22 +249,26 @@ var createWorldCreator = function() {
             reward += (pressedButtons * -2);
             reward += (hasTransport * 50);
 
+            oldWorld = {
+                moveCount,
+                transportedCounter,
+            };
+
             return reward;
         }
 
         let cb = undefined;
 
-        let oldWorld = {...world};
         world.on('stats_changed', function () {
             if (cb == null) return;
 
+            // make it morkov env
             const idleElevator = world.elevatorInterfaces.find(elevator => elevator.destinationQueue.length === 0);
 
             if (!world.challengeEnded && !idleElevator) return;
 
-            const reward = calculateReward(world, oldWorld);
-            cb(reward);
-            oldWorld = {...world};
+            const reward = calculateReward(world);
+            cb({reward});
             cb = undefined;
         });
 
@@ -273,8 +277,15 @@ var createWorldCreator = function() {
             elevators.forEach((elevator, i) => elevator.goToFloor(action[i], true));
 
             return new Promise((resolve => {
-                cb = resolve
+                cb = resolve;
             }));
+        };
+
+        world.endChallenge = function () {
+            world.challengeEnded = true;
+            if (cb == null) return;
+            cb({end: true});
+            cb = undefined;
         };
 
         // TODO fix for multiple elevators

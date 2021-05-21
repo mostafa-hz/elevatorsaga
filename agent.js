@@ -98,13 +98,16 @@ const createAgent = function (options) {
 
             while (!world.challengeEnded) {
                 const observation = observe(world);
-                memory.observations.push(observation);
-
                 const action = Math.random() > exploreRate ? getBestAction(world, observation) : getRandomAction(world);
-                memory.actions.push(action);
+                const {reward, end} = await world.takeAction(world, action);
 
-                const reward = await world.takeAction(world, action);
+                if (end) break;
+
+                memory.observations.push(observation);
+                memory.actions.push(action);
                 memory.rewards.push(reward);
+
+                console.log(action[0], '->', reward);
             }
 
             console.log('play done');

@@ -183,7 +183,7 @@ $(function() {
         app.world.on("stats_changed", function() {
             var challengeStatus = challenges[challengeIndex].condition.evaluate(app.world);
             if(challengeStatus !== null) {
-                app.world.challengeEnded = true;
+                app.world.endChallenge();
                 app.worldController.setPaused(true);
                 if(challengeStatus) {
                     presentFeedback($feedback, feedbackTempl, app.world, "Success!", "Challenge completed", createParamsUrl(params, { challenge: (challengeIndex + 2)}));
