@@ -276,12 +276,13 @@ var createWorldCreator = function() {
         let cb = undefined;
 
         world.on('stats_changed', function () {
+            // TODO fix for multiple elevators
             if (cb == null) return;
 
             // make it morkov env
-            const idleElevator = world.elevatorInterfaces.find(elevator => elevator.destinationQueue.length === 0);
-
-            if (!world.challengeEnded && !idleElevator) return;
+            const elevator = world.elevatorInterfaces[0];
+            const idleElevator = elevator.destinationQueue.length === 0;
+            if (!idleElevator || elevator.isBusy()) return;
 
             const reward = calculateReward(world);
             cb({reward});
