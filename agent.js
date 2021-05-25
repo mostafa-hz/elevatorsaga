@@ -76,10 +76,12 @@ const createAgent = function (options) {
     const inputSize = statesSize + actionSize;
     const model = tf.sequential({
         layers: [
-            tf.layers.dense({inputShape: [inputSize], units: inputSize, activation: 'linear'}),
-            tf.layers.dense({units: 27, activation: 'linear'}),
-            tf.layers.dense({units: 9, activation: 'linear'}),
-            tf.layers.dense({units: 3, activation: 'linear'}),
+            tf.layers.dense({inputShape: [inputSize], units: inputSize}),
+            tf.layers.leakyReLU(),
+            tf.layers.dense({units: 27}),
+            tf.layers.leakyReLU(),
+            tf.layers.dense({units: 9}),
+            tf.layers.leakyReLU(),
             tf.layers.dense({units: 1}),
         ]
     });
