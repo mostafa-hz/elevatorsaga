@@ -76,15 +76,16 @@ const createAgent = function (options) {
     const inputSize = statesSize + actionSize;
     const model = tf.sequential({
         layers: [
-            tf.layers.dense({inputShape: [inputSize], units: inputSize, activation: 'relu'}),
-            tf.layers.dense({units: floorCount * elevatorCount * 3, activation: 'relu'}),
-            tf.layers.dense({units: elevatorCount, activation: 'relu'}),
+            tf.layers.dense({inputShape: [inputSize], units: inputSize, activation: 'linear'}),
+            tf.layers.dense({units: 27, activation: 'linear'}),
+            tf.layers.dense({units: 9, activation: 'linear'}),
+            tf.layers.dense({units: 3, activation: 'linear'}),
             tf.layers.dense({units: 1}),
         ]
     });
     model.compile({
         loss: tf.losses.meanSquaredError,
-        optimizer: tf.train.adam(0.05),
+        optimizer: tf.train.adam(0.3),
         metrics: ['accuracy'],
     });
 
