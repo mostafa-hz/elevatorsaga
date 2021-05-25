@@ -254,12 +254,12 @@ var createWorldCreator = function() {
 
             const loadUser = loadFactor > loadFactorOld;
 
-            reward += (moves * (loadFactor + 1) * -4);
+            reward += (moves * -1);
             reward += (pressedButtons * -2);
             reward += (hasTransport * 50);
             reward += (loadUser * 10);
 
-            if (!loadUser && !hasTransport && (pressedButtons > 0 || loadFactor > 0)){
+            if (!hasTransport && !loadUser && (pressedButtons > 0 || loadFactor > 0)){
                 reward += -200
             }
 
