@@ -8,8 +8,8 @@ const createAgent = function (options) {
         for (let i = 0; i < elevators.length; i++) {
             const elevator = elevators[i];
             // envState[`eMaxPassengerCount${i}`] = elevator.maxPassengerCount();
-            envState[`eCurrentFloor${i}`] = elevator.currentFloor();
-            envState[`eLoadFactor${i}`] = elevator.loadFactor();
+            envState[`e${i}_CF`] = elevator.currentFloor();
+            envState[`e${i}_LF`] = elevator.loadFactor();
             let direction;
             switch (elevator.destinationDirection()) {
                 case 'up':
@@ -22,19 +22,19 @@ const createAgent = function (options) {
                     direction = 0;
                     break;
             }
-            envState[`eDestinationDirection${i}`] = direction;
+            envState[`e${i}_DD`] = direction;
             const pressedFloors = new Array(floors.length);
             for (let j of elevator.getPressedFloors()) {
                 pressedFloors[j] = true
             }
             for (let j = 0; j < floors.length; j++) {
-                envState[`ePressedFloor${i}${j}`] = Number(pressedFloors[j] === true);
+                envState[`e${i}_PF${j}`] = Number(pressedFloors[j] === true);
             }
         }
         for (let i = 0; i < floors.length; i++) {
             const floor = floors[i];
-            envState[`fUpPressed${i}`] = Number(floor.buttonStates.up === 'activated');
-            envState[`fDownPressed${i}`] = Number(floor.buttonStates.down === 'activated');
+            envState[`f${i}_PU`] = Number(floor.buttonStates.up === 'activated');
+            envState[`f${i}_PD`] = Number(floor.buttonStates.down === 'activated');
         }
 
         return envState;
