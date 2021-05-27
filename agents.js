@@ -42,7 +42,7 @@ const createShabbatAgent = function() {
     }
 };
 
-const createDeepAgent = function(options) {
+const createDeepAgent = async function(options, modelFiles) {
     const { floorCount, elevatorCount } = options;
 
     function observe(world) {
@@ -106,7 +106,6 @@ const createDeepAgent = function(options) {
                 maxRewardIndex = i;
             }
         });
-        console.log('expected', maxReward);
         return world.possibleActions[maxRewardIndex]
     }
 
@@ -115,21 +114,28 @@ const createDeepAgent = function(options) {
         return world.possibleActions[randomIndex]
     }
 
-    // buildModel
-    const statesSize = (floorCount * 2) + (elevatorCount * 3) + (floorCount * elevatorCount);
-    const actionSize = floorCount * elevatorCount;
-    const inputSize = statesSize + actionSize;
-    const model = tf.sequential({
-        layers: [
-            tf.layers.dense({ inputShape: [inputSize], units: inputSize }),
-            tf.layers.leakyReLU(),
-            tf.layers.dense({ units: 27 }),
-            tf.layers.leakyReLU(),
-            tf.layers.dense({ units: 9 }),
-            tf.layers.leakyReLU(),
-            tf.layers.dense({ units: 1 }),
-        ]
-    });
+    async function loadModel() {
+        return tf.loadLayersModel(tf.io.browserFiles([modelFiles[0], modelFiles[1]]));
+    }
+
+    function buildModel() {
+        const statesSize = (floorCount * 2) + (elevatorCount * 3) + (floorCount * elevatorCount);
+        const actionSize = floorCount * elevatorCount;
+        const inputSize = statesSize + actionSize;
+        return tf.sequential({
+            layers: [
+                tf.layers.dense({ inputShape: [inputSize], units: inputSize }),
+                tf.layers.leakyReLU(),
+                tf.layers.dense({ units: 27 }),
+                tf.layers.leakyReLU(),
+                tf.layers.dense({ units: 9 }),
+                tf.layers.leakyReLU(),
+                tf.layers.dense({ units: 1 }),
+            ]
+        });
+    }
+
+    const model = modelFiles?.length === 2 ? await loadModel() : buildModel();
     model.compile({
         loss: tf.losses.meanSquaredError,
         optimizer: tf.train.adam(0.3),
@@ -167,20 +173,12 @@ const createDeepAgent = function(options) {
                 rewards,
             } = memory;
 
-            const accReward = rewards.reduce((pre, curr) => pre + curr, 0);
-
-            console.log('r:', accReward, 't:', world.avgWaitTime, 'c:', world.moveCount, 'tc:', world.transportedCounter,);
-
             const netInputs = observations.map((state, i) => generateNetInput(observations[i], actions[i]));
             await model.fit(tf.tensor(netInputs), tf.tensor(rewards));
         },
 
         saveModel: async function(name) {
-            // TODO
+            await model.save(`downloads://${name}`);
         },
-
-        loadModel: async function(name) {
-            // TODO
-        }
     }
 };

@@ -164,12 +164,11 @@
             </div>
         </div>
 
-        <div class="codestatus"></div>
-        <div class="code" style="visibility: hidden; height: 0">
+        <div class="code" style="display: none;">
             <textarea name="Code" id="code"></textarea>
         </div>
 
-        <div style="margin-bottom: 24px;">
+        <div style="margin: 24px 0;">
             <h3 style="display: inline-block">Agent: </h3>
             <select name="algorithms" id="selector_agents" style="display: inline-block">
                 <option value="random">Random</option>
@@ -177,6 +176,25 @@
                 <option value="deep">Deep</option>
             </select>
             <button id="button_apply" style="display: inline-block; margin-left: 12px">Apply</button>
+        </div>
+
+        <div id="deep_agent_config" style="margin: 24px 0;">
+            <h3 >Deep Agent Model Config: </h3>
+
+            <h4 id="text_imported_file" ></h4>
+
+            <button type="button" value="Import" onclick="document.getElementById('file_import_model').click();">Import</button>
+            <input type="file" style="display:none;" id="file_import_model" name="file_import_model" multiple/>
+
+            <button id="button_export_model" style="display: inline-block;">Export</button>
+            <button id="button_reset" style="display: inline-block;" onclick="document.getElementById('file_import_model').value=''">Reset</button>
+
+            <div style="margin: 12px 0;">
+                <h4 style="display: inline-block">train model:</h4>
+                <label>
+                    <input id="input_train" type="checkbox">
+                </label>
+            </div>
         </div>
     </div>
 

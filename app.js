@@ -53,26 +53,6 @@ var createEditor = function() {
         reset();
     }
 
-    $("#button_save").click(function() {
-        saveCode();
-        cm.focus();
-    });
-
-    $("#button_reset").click(function() {
-        if(confirm("Do you really want to reset to the default implementation?")) {
-            localStorage.setItem("develevateBackupCode", cm.getValue());
-            reset();
-        }
-        cm.focus();
-    });
-
-    $("#button_resetundo").click(function() {
-        if(confirm("Do you want to bring back the code as before the last reset?")) {
-            cm.setValue(localStorage.getItem("develevateBackupCode") || "");
-        }
-        cm.focus();
-    });
-
     var returnObj = riot.observable({});
     var autoSaver = _.debounce(saveCode, 1000);
     cm.on("change", function() {
@@ -80,7 +60,6 @@ var createEditor = function() {
     });
 
     returnObj.getCodeObj = function() {
-        console.log("Getting code...");
         var code = cm.getValue();
         var obj;
         try {
@@ -105,6 +84,28 @@ var createEditor = function() {
     $("#button_apply").click(function() {
         returnObj.trigger("apply_code");
     });
+
+    $("#button_export_model").click(function() {
+        returnObj.trigger("export_model");
+    });
+
+    function setImportedFileText() {
+        const fileInput = $("#file_import_model")[0];
+
+        let importedFileNames = '';
+        fileInput?.files?.forEach(it => {
+            importedFileNames += '<br>' + it.name
+        });
+        if(importedFileNames.trim().length === 0) {
+            importedFileNames = 'none';
+        }
+        $('#text_imported_file')[0].innerHTML = `imported files: ${importedFileNames}`;
+    }
+
+    $('#file_import_model').change(setImportedFileText);
+    $('#button_reset').click(setImportedFileText);
+    setImportedFileText();
+
     return returnObj;
 };
 
@@ -126,7 +127,6 @@ $(function() {
     var $stats = $(".statscontainer");
     var $feedback = $(".feedbackcontainer");
     var $challenge = $(".challenge");
-    var $codestatus = $(".codestatus");
 
     var floorTempl = document.getElementById("floor-template").innerHTML.trim();
     var elevatorTempl = document.getElementById("elevator-template").innerHTML.trim();
@@ -134,7 +134,6 @@ $(function() {
     var userTempl = document.getElementById("user-template").innerHTML.trim();
     var challengeTempl = document.getElementById("challenge-template").innerHTML.trim();
     var feedbackTempl = document.getElementById("feedback-template").innerHTML.trim();
-    var codeStatusTempl = document.getElementById("codestatus-template").innerHTML.trim();
 
     var app = riot.observable({});
     app.worldController = createWorldController(1.0 / 60.0);
@@ -196,6 +195,7 @@ $(function() {
         app.worldController.start(app.world, codeObj, window.requestAnimationFrame, autoStart);
         if(!app.agent) return;
         app.agent.play(app.world, app.exploreRate).then(async memory => {
+            if(!app.train) return;
             await app.agent.train(memory);
             if(!autoStart) return;
             app.exploreRate -= 0.01;
@@ -203,7 +203,7 @@ $(function() {
         });
     };
 
-    editor.on("apply_code", function() {
+    editor.on("apply_code", async function() {
         let agentSelector = $("#selector_agents")[0];
         const agentType = agentSelector.value;
         switch(agentType) {
@@ -214,11 +214,19 @@ $(function() {
                 app.agent = createShabbatAgent(challenges[app.currentChallengeIndex].options);
                 break;
             case 'deep':
-                app.agent = createDeepAgent(challenges[app.currentChallengeIndex].options);
+                const fileInput = $("#file_import_model")[0];
+                app.train = $('#input_train')[0].checked;
+                app.exploreRate = 0.9;
+                app.agent = await createDeepAgent(challenges[app.currentChallengeIndex].options, fileInput.files);
                 break;
         }
-        app.exploreRate = 0.9;
         app.startChallenge(app.currentChallengeIndex, true);
+    });
+    editor.on("export_model", async function() {
+        if(app.agent?.saveModel != null) {
+            const { floorCount, elevatorCount } = challenges[app.currentChallengeIndex].options;
+            await app.agent.saveModel(`agent-F${floorCount}E${elevatorCount}-${new Date().getTime()}.model`);
+        }
     });
     editor.trigger("change");
 
