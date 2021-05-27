@@ -49,6 +49,7 @@ var asElevatorInterface = function(obj, elevator, floorCount, errorHandler) {
     elevatorInterface.currentFloor = function() { return elevator.currentFloor; };
     elevatorInterface.maxPassengerCount = function() { return elevator.maxUsers; };
     elevatorInterface.loadFactor = function() { return elevator.getLoadFactor(); };
+    elevatorInterface.isBusy = function() { return elevator.isBusy() };
     elevatorInterface.destinationDirection = function() {
       if(elevator.destinationY === elevator.y) { return "stopped"; }
       return elevator.destinationY > elevator.y ? "down" : "up";

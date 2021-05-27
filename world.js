@@ -184,7 +184,7 @@ var createWorldCreator = function() {
                     users.splice(i, 1);
                 }
             }
-            
+
             recalculateStats();
         };
 
@@ -203,7 +203,7 @@ var createWorldCreator = function() {
             _.each(world.elevators.concat(world.elevatorInterfaces).concat(world.users).concat(world.floors).concat([world]), function(obj) {
                 obj.off("*");
             });
-            world.challengeEnded = true;
+            world.endChallenge();
             world.elevators = world.elevatorInterfaces = world.users = world.floors = [];
         };
 
@@ -213,6 +213,107 @@ var createWorldCreator = function() {
                 world.elevatorInterfaces[i].checkDestinationQueue();
             }
         };
+
+        let oldWorld = {
+            moveCount: 0,
+            transportedCounter: 0,
+            loadFactor: 0,
+        };
+        function calculateReward (world) {
+            // TODO Fix For Multiple elevators
+            const {
+                elapsedTime,
+                transportedPerSec,
+                maxWaitTime,
+                avgWaitTime,
+                moveCount,
+                transportedCounter,
+            } = world;
+
+            const {
+                moveCount: moveCountOld,
+                transportedCounter: transportedCounterOld,
+                loadFactor: loadFactorOld,
+            } = oldWorld;
+
+            let pressedButtons = 0;
+            world.floors.forEach(floor => {
+                pressedButtons += Number(floor.buttonStates.up === 'activated');
+                pressedButtons += Number(floor.buttonStates.down === 'activated');
+            });
+
+            let loadFactor = 0;
+            world.elevatorInterfaces.forEach((elevator, i) => {
+                loadFactor += elevator.loadFactor();
+            });
+
+            let reward = 0;
+            const moves = moveCount - moveCountOld;
+            const transports = transportedCounter - transportedCounterOld;
+            const hasTransport = transports > 0;
+
+            const loadUser = loadFactor > loadFactorOld;
+
+            reward += (moves * -1);
+            reward += (pressedButtons * -2);
+            reward += (hasTransport * 50);
+            reward += (loadUser * 10);
+
+            if (!hasTransport && !loadUser && (pressedButtons > 0 || loadFactor > 0)){
+                reward += -200
+            }
+
+
+            oldWorld = {
+                moveCount,
+                transportedCounter,
+                loadFactor,
+            };
+
+            return reward;
+        }
+
+        let cb = undefined;
+
+        world.on('stats_changed', function () {
+            // TODO fix for multiple elevators
+            if (cb == null) return;
+
+            // make it morkov env
+            const elevator = world.elevatorInterfaces[0];
+            const idleElevator = elevator.destinationQueue.length === 0;
+            if (!idleElevator || elevator.isBusy()) return;
+
+            const reward = calculateReward(world);
+            cb({reward});
+            cb = undefined;
+        });
+
+        world.takeAction = async function (world, action) {
+            const elevators = world.elevatorInterfaces;
+            elevators.forEach((elevator, i) => elevator.goToFloor(action[i], true));
+
+            return new Promise((resolve => {
+                cb = resolve;
+            }));
+        };
+
+        world.endChallenge = function () {
+            world.challengeEnded = true;
+            if (cb == null) return;
+            cb({end: true});
+            cb = undefined;
+        };
+
+        // TODO fix for multiple elevators
+        world.possibleActions = [];
+        for (let i = 0; i < options.floorCount ** options.elevatorCount; i++) {
+            let action = [];
+            for (let j = 0; j < options.elevatorCount; j++) {
+                action.push(i)
+            }
+            world.possibleActions.push(action);
+        }
 
         return world;
     };
