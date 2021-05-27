@@ -96,17 +96,16 @@ const createDeepAgent = async function(options, modelFiles) {
     }
 
     function getBestAction(world, state) {
-        let maxRewardIndex = 0;
-        let maxReward = -Infinity;
-        world.possibleActions.forEach((action, i) => {
-            const input = generateNetInput(state, action);
-            const expectedReward = model.predict(tf.tensor([input])).dataSync()[0];
-            if(expectedReward > maxReward) {
-                maxReward = expectedReward;
-                maxRewardIndex = i;
+        const inputs = world.possibleActions.map(action => generateNetInput(state, action));
+        const expectedRewards = model.predict(tf.tensor(inputs)).dataSync();
+
+        let maxIndex = 0;
+        expectedRewards.forEach((reward, i) => {
+            if(reward > expectedRewards[expectedRewards]) {
+                maxIndex = i;
             }
         });
-        return world.possibleActions[maxRewardIndex]
+        return world.possibleActions[maxIndex]
     }
 
     function getRandomAction(world) {
