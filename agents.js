@@ -1,17 +1,61 @@
-const createAgent = function (options) {
-    const {floorCount, elevatorCount} = options;
+const createRandomAgent = function() {
+    function getRandomAction(world) {
+        const randomIndex = Math.floor(Math.random() * world.possibleActions.length);
+        return world.possibleActions[randomIndex]
+    }
+
+    return {
+        play: async function(world) {
+            const memory = {
+                observations: [],
+                actions: [],
+                rewards: [],
+            };
+
+            while(!world.challengeEnded) {
+                const action = getRandomAction(world);
+                const { end } = await world.takeAction(world, action);
+                if(end) break;
+            }
+
+            return memory;
+        },
+    }
+};
+
+const createShabbatAgent = function() {
+    let lastIndex = 0;
+
+    function getNextAction(world) {
+        lastIndex = (lastIndex + 1) % world.possibleActions.length;
+        return world.possibleActions[lastIndex];
+    }
+
+    return {
+        play: async function(world) {
+            while(!world.challengeEnded) {
+                const action = getNextAction(world);
+                const { end } = await world.takeAction(world, action);
+                if(end) break;
+            }
+        },
+    }
+};
+
+const createDeepAgent = function(options) {
+    const { floorCount, elevatorCount } = options;
 
     function observe(world) {
         const envState = {};
         const elevators = world.elevatorInterfaces;
         const floors = world.floors;
-        for (let i = 0; i < elevators.length; i++) {
+        for(let i = 0; i < elevators.length; i++) {
             const elevator = elevators[i];
             // envState[`eMaxPassengerCount${i}`] = elevator.maxPassengerCount();
             envState[`e${i}_CF`] = elevator.currentFloor();
             envState[`e${i}_LF`] = elevator.loadFactor();
             let direction;
-            switch (elevator.destinationDirection()) {
+            switch(elevator.destinationDirection()) {
                 case 'up':
                     direction = 1;
                     break;
@@ -24,14 +68,14 @@ const createAgent = function (options) {
             }
             envState[`e${i}_DD`] = direction;
             const pressedFloors = new Array(floors.length);
-            for (let j of elevator.getPressedFloors()) {
+            for(let j of elevator.getPressedFloors()) {
                 pressedFloors[j] = true
             }
-            for (let j = 0; j < floors.length; j++) {
+            for(let j = 0; j < floors.length; j++) {
                 envState[`e${i}_PF${j}`] = Number(pressedFloors[j] === true);
             }
         }
-        for (let i = 0; i < floors.length; i++) {
+        for(let i = 0; i < floors.length; i++) {
             const floor = floors[i];
             envState[`f${i}_PU`] = Number(floor.buttonStates.up === 'activated');
             envState[`f${i}_PD`] = Number(floor.buttonStates.down === 'activated');
@@ -43,8 +87,8 @@ const createAgent = function (options) {
     function generateNetInput(state, action) {
         const stateInput = Object.values(state);
         let actionInput = [];
-        for (const a of action) {
-            for (let f = 0; f < floorCount; f++) {
+        for(const a of action) {
+            for(let f = 0; f < floorCount; f++) {
                 actionInput.push(f === a ? 1 : 0)
             }
         }
@@ -57,11 +101,12 @@ const createAgent = function (options) {
         world.possibleActions.forEach((action, i) => {
             const input = generateNetInput(state, action);
             const expectedReward = model.predict(tf.tensor([input])).dataSync()[0];
-            if (expectedReward > maxReward) {
+            if(expectedReward > maxReward) {
                 maxReward = expectedReward;
                 maxRewardIndex = i;
             }
         });
+        console.log('expected', maxReward);
         return world.possibleActions[maxRewardIndex]
     }
 
@@ -76,13 +121,13 @@ const createAgent = function (options) {
     const inputSize = statesSize + actionSize;
     const model = tf.sequential({
         layers: [
-            tf.layers.dense({inputShape: [inputSize], units: inputSize}),
+            tf.layers.dense({ inputShape: [inputSize], units: inputSize }),
             tf.layers.leakyReLU(),
-            tf.layers.dense({units: 27}),
+            tf.layers.dense({ units: 27 }),
             tf.layers.leakyReLU(),
-            tf.layers.dense({units: 9}),
+            tf.layers.dense({ units: 9 }),
             tf.layers.leakyReLU(),
-            tf.layers.dense({units: 1}),
+            tf.layers.dense({ units: 1 }),
         ]
     });
     model.compile({
@@ -92,33 +137,30 @@ const createAgent = function (options) {
     });
 
     return {
-        play: async function (world, exploreRate = 0) {
+        play: async function(world, exploreRate = 0) {
             const memory = {
                 observations: [],
                 actions: [],
                 rewards: [],
             };
 
-            while (!world.challengeEnded) {
+            while(!world.challengeEnded) {
                 const observation = observe(world);
-                const action = Math.random() > exploreRate ? getBestAction(world, observation) : getRandomAction(world);
-                const {reward, end} = await world.takeAction(world, action);
+                const explore = Math.random() < exploreRate;
+                const action = explore ? getRandomAction(world) : getBestAction(world, observation);
+                const { reward, end } = await world.takeAction(world, action);
 
-                if (end) break;
+                if(end) break;
 
                 memory.observations.push(observation);
                 memory.actions.push(action);
                 memory.rewards.push(reward);
-
-                console.log(action[0], '->', reward);
             }
-
-            console.log('play done');
 
             return memory;
         },
 
-        train: async function (memory) {
+        train: async function(memory) {
             const {
                 observations,
                 actions,
@@ -133,11 +175,11 @@ const createAgent = function (options) {
             await model.fit(tf.tensor(netInputs), tf.tensor(rewards));
         },
 
-        saveModel: async function (name) {
+        saveModel: async function(name) {
             // TODO
         },
 
-        loadModel: async function (name) {
+        loadModel: async function(name) {
             // TODO
         }
     }

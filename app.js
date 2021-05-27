@@ -1,4 +1,3 @@
-
 var createEditor = function() {
     var lsKey = "elevatorCrushCode_v5";
 
@@ -117,7 +116,6 @@ var createParamsUrl = function(current, overrides) {
 };
 
 
-
 $(function() {
     var tsKey = "elevatorTimeScale";
     var editor = createEditor();
@@ -186,7 +184,7 @@ $(function() {
                 app.world.endChallenge();
                 app.worldController.setPaused(true);
                 if(challengeStatus) {
-                    presentFeedback($feedback, feedbackTempl, app.world, "Success!", "Challenge completed", createParamsUrl(params, { challenge: (challengeIndex + 2)}));
+                    presentFeedback($feedback, feedbackTempl, app.world, "Success!", "Challenge completed", createParamsUrl(params, { challenge: (challengeIndex + 2) }));
                 } else {
                     presentFeedback($feedback, feedbackTempl, app.world, "Challenge failed", "Maybe your program needs an improvement?", "");
                 }
@@ -199,42 +197,38 @@ $(function() {
         if(!app.agent) return;
         app.agent.play(app.world, app.exploreRate).then(async memory => {
             await app.agent.train(memory);
-            if (!autoStart) return;
-            app.exploreRate -= 0.00001;
+            if(!autoStart) return;
+            app.exploreRate -= 0.01;
             app.startChallenge(challengeIndex, autoStart)
         });
     };
 
     editor.on("apply_code", function() {
-        app.agent = createAgent(challenges[app.currentChallengeIndex].options, true);
+        let agentSelector = $("#selector_agents")[0];
+        const agentType = agentSelector.value;
+        switch(agentType) {
+            case 'random':
+                app.agent = createRandomAgent(challenges[app.currentChallengeIndex].options);
+                break;
+            case 'shabbat':
+                app.agent = createShabbatAgent(challenges[app.currentChallengeIndex].options);
+                break;
+            case 'deep':
+                app.agent = createDeepAgent(challenges[app.currentChallengeIndex].options);
+                break;
+        }
         app.exploreRate = 0.9;
         app.startChallenge(app.currentChallengeIndex, true);
-    });
-    editor.on("code_success", function() {
-        presentCodeStatus($codestatus, codeStatusTempl);
-    });
-    editor.on("usercode_error", function(error) {
-        presentCodeStatus($codestatus, codeStatusTempl, error);
-    });
-    editor.on("change", function() {
-        $("#fitness_message").addClass("faded");
-        var codeStr = editor.getCode();
-        // fitnessSuite(codeStr, true, function(results) {
-        //     var message = "";
-        //     if(!results.error) {
-        //         message = "Fitness avg wait times: " + _.map(results, function(r){ return r.options.description + ": " + r.result.avgWaitTime.toPrecision(3) + "s" }).join("&nbsp&nbsp&nbsp");
-        //     } else {
-        //         message = "Could not compute fitness due to error: " + results.error;
-        //     }
-        //     $("#fitness_message").html(message).removeClass("faded");
-        // });
     });
     editor.trigger("change");
 
     riot.route(function(path) {
         params = _.reduce(path.split(","), function(result, p) {
             var match = p.match(/(\w+)=(\w+$)/);
-            if(match) { result[match[1]] = match[2]; } return result;
+            if(match) {
+                result[match[1]] = match[2];
+            }
+            return result;
         }, {});
         var requestedChallenge = 0;
         var autoStart = false;
