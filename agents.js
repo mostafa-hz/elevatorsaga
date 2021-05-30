@@ -156,7 +156,6 @@ const createDeepAgent = async function(options, modelFiles) {
                 const explore = Math.random() < exploreRate;
                 const action = explore ? getRandomAction(world) : getBestAction(world, observation);
                 const { reward, end } = await world.takeAction(world, action);
-                console.log('action',action,'-> reward:',reward);
 
                 if(end) break;
 
