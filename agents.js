@@ -101,7 +101,7 @@ const createDeepAgent = async function(options, modelFiles) {
 
         let maxIndex = 0;
         expectedRewards.forEach((reward, i) => {
-            if(reward > expectedRewards[expectedRewards]) {
+            if(reward > expectedRewards[maxIndex]) {
                 maxIndex = i;
             }
         });
@@ -156,6 +156,7 @@ const createDeepAgent = async function(options, modelFiles) {
                 const explore = Math.random() < exploreRate;
                 const action = explore ? getRandomAction(world) : getBestAction(world, observation);
                 const { reward, end } = await world.takeAction(world, action);
+                console.log('action',action,'-> reward:',reward);
 
                 if(end) break;
 
