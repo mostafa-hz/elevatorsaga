@@ -114,7 +114,9 @@ const createDeepAgent = async function(options, modelFiles) {
     }
 
     async function loadModel() {
-        return tf.loadLayersModel(tf.io.browserFiles([modelFiles[0], modelFiles[1]]));
+        const modelFile = Object.values(modelFiles).find(it => it.name.endsWith('.model.json'));
+        const weightsFile =  Object.values(modelFiles).find(it => it.name.endsWith('.model.weights.bin'));
+        return tf.loadLayersModel(tf.io.browserFiles([modelFile, weightsFile]));
     }
 
     function buildModel() {
