@@ -86,19 +86,8 @@
 
     <script type="text/plain" id="default-elev-implementation">
 {
-    init: function(elevators, floors) {
-        var elevator = elevators[0]; // Let's use the first elevator
-
-        // Whenever the elevator is idle (has no more queued destinations) ...
-        elevator.on("idle", function() {
-            // let's go to all the floors (or did we forget one?)
-            elevator.goToFloor(0);
-            elevator.goToFloor(1);
-        });
-    },
-    update: function(dt, elevators, floors) {
-        // We normally don't need to do anything here
-    }
+    init: function(elevators, floors) {},
+    update: function(dt, elevators, floors) {}
 }
     </script>
     <script type="text/plain" id="devtest-elev-implementation">
@@ -164,9 +153,10 @@
             </div>
         </div>
 
-        <div class="code" style="display: none;">
+        <div class="code" style="display: inline;">
             <textarea name="Code" id="code"></textarea>
-        </div>
+        </div>var elevator = elevators[0]; // Let's use the first elevator
+
 
         <div style="margin: 24px 0;">
             <h3 style="display: inline-block">Agent: </h3>
