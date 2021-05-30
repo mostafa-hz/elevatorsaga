@@ -146,7 +146,7 @@ $(function() {
     app.worldCreator = createWorldCreator();
     app.world = undefined;
     app.agent = undefined;
-    app.exploreRate = 0.9;
+    app.exploreRate = 1;
 
     app.currentChallengeIndex = 0;
 
@@ -198,7 +198,8 @@ $(function() {
             if(!app.train) return;
             await app.agent.train(memory);
             if(!autoStart) return;
-            app.exploreRate -= 0.01;
+            app.exploreRate -= 0.005;
+            if(app.exploreRate < 0) return;
             app.startChallenge(challengeIndex, autoStart)
         });
     };
@@ -216,7 +217,7 @@ $(function() {
             case 'deep':
                 const fileInput = $("#file_import_model")[0];
                 app.train = $('#input_train')[0].checked;
-                app.exploreRate = 0.9;
+                app.exploreRate = app.train ? 0.9 : 0;
                 app.agent = await createDeepAgent(challenges[app.currentChallengeIndex].options, fileInput.files);
                 break;
         }
