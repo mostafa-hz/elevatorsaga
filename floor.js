@@ -1,4 +1,3 @@
-
 var asFloor = function(obj, floorLevel, yPosition, errorHandler) {
     var floor = riot.observable(obj);
 
@@ -48,6 +47,10 @@ var asFloor = function(obj, floorLevel, yPosition, errorHandler) {
 
     floor.floorNum = function() {
         return floor.level;
+    };
+
+    floor.hasActiveButton = function() {
+        return floor.buttonStates.up === 'activated' || floor.buttonStates.down === 'activated'
     };
 
     return floor;
