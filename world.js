@@ -311,9 +311,13 @@ var createWorldCreator = function() {
             cb = undefined;
         });
 
-        world.takeAction = async function(world, action) {
+        world.takeAction = async function(world, action, indicators = []) {
             const elevators = world.elevatorInterfaces;
-            elevators.forEach((elevator, i) => elevator.goToFloor(action[i], true));
+            elevators.forEach((elevator, i) => {
+                elevator.goToFloor(action[i], true);
+                elevator.goingUpIndicator(indicators[i]?.up ?? true);
+                elevator.goingDownIndicator(indicators[i]?.down ?? true);
+            });
 
             return new Promise((resolve => {
                 cb = resolve;

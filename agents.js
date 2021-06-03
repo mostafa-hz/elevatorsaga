@@ -108,6 +108,13 @@ const createDeepAgent = async function(options, modelFiles) {
         return world.possibleActions[maxIndex]
     }
 
+    function getIndicators(world, action) {
+        return world.elevatorInterfaces.map((elevator, i) => ({
+            up: action[i] !== world.floors.length - 1 && (action[i] === 0 || elevator.loadFactor() === 0 || elevator.currentFloor() <= action[i]),
+            down: action[i] !== 0 && (action[i] === world.floors.length - 1 || elevator.loadFactor() === 0 || elevator.currentFloor() >= action[i]),
+        }));
+    }
+
     function getRandomAction(world) {
         const randomIndex = Math.floor(Math.random() * world.possibleActions.length);
         return world.possibleActions[randomIndex]
@@ -155,7 +162,8 @@ const createDeepAgent = async function(options, modelFiles) {
                 const observation = observe(world);
                 const explore = Math.random() < exploreRate;
                 const action = explore ? getRandomAction(world) : getBestAction(world, observation);
-                const { reward, end } = await world.takeAction(world, action);
+                const indicators = getIndicators(world, action);
+                const { reward, end } = await world.takeAction(world, action, indicators);
 
                 if(end) break;
 
