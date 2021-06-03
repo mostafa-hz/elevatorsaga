@@ -54,6 +54,7 @@ const createDeepAgent = async function(options, modelFiles) {
             // envState[`eMaxPassengerCount${i}`] = elevator.maxPassengerCount();
             envState[`e${i}_CF`] = elevator.currentFloor();
             envState[`e${i}_LF`] = elevator.loadFactor();
+            envState[`e${i}_LI`] = (elevator.goingDownIndicator() * -1) + (elevator.goingUpIndicator() * 1);
             let direction;
             switch(elevator.destinationDirection()) {
                 case 'up':
@@ -122,12 +123,12 @@ const createDeepAgent = async function(options, modelFiles) {
 
     async function loadModel() {
         const modelFile = Object.values(modelFiles).find(it => it.name.endsWith('.model.json'));
-        const weightsFile =  Object.values(modelFiles).find(it => it.name.endsWith('.model.weights.bin'));
+        const weightsFile = Object.values(modelFiles).find(it => it.name.endsWith('.model.weights.bin'));
         return tf.loadLayersModel(tf.io.browserFiles([modelFile, weightsFile]));
     }
 
     function buildModel() {
-        const statesSize = (floorCount * 2) + (elevatorCount * 3) + (floorCount * elevatorCount);
+        const statesSize = (floorCount * 2) + (elevatorCount * 4) + (floorCount * elevatorCount);
         const actionSize = floorCount * elevatorCount;
         const inputSize = statesSize + actionSize;
         return tf.sequential({
