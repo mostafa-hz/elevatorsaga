@@ -133,11 +133,9 @@ const createDeepAgent = async function(options, modelFiles) {
         const inputSize = statesSize + actionSize;
         return tf.sequential({
             layers: [
-                tf.layers.dense({ inputShape: [inputSize], units: inputSize }),
+                tf.layers.dense({ inputShape: [inputSize], units: inputSize * 2 }),
                 tf.layers.leakyReLU(),
-                tf.layers.dense({ units: 27 }),
-                tf.layers.leakyReLU(),
-                tf.layers.dense({ units: 9 }),
+                tf.layers.dense({ units: inputSize }),
                 tf.layers.leakyReLU(),
                 tf.layers.dense({ units: 1 }),
             ]
@@ -147,9 +145,10 @@ const createDeepAgent = async function(options, modelFiles) {
     const model = modelFiles?.length === 2 ? await loadModel() : buildModel();
     model.compile({
         loss: tf.losses.meanSquaredError,
-        optimizer: tf.train.adam(0.3),
+        optimizer: tf.train.adam(0.01),
         metrics: ['accuracy'],
     });
+    model.summary();
 
     return {
         play: async function(world, exploreRate = 0) {
