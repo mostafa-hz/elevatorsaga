@@ -222,7 +222,6 @@ var createWorldCreator = function() {
             transportedCounter: 0,
             loadFactor: 0,
             elevatorFloor: 0,
-            elevatorDirection: 0,
             elevatorIndicator: 0,
         };
 
@@ -257,7 +256,6 @@ var createWorldCreator = function() {
                 transportedCounter,
                 loadFactor,
                 elevatorFloor,
-                elevatorDirection,
                 elevatorIndicator,
             };
 
@@ -299,12 +297,12 @@ var createWorldCreator = function() {
             cb = undefined;
         });
 
-        world.takeAction = async function(world, action, indicators = []) {
+        world.takeAction = async function(action) {
             const elevators = world.elevatorInterfaces;
             elevators.forEach((elevator, i) => {
-                elevator.goToFloor(action[i], true);
-                elevator.goingUpIndicator(indicators[i]?.up ?? true);
-                elevator.goingDownIndicator(indicators[i]?.down ?? true);
+                elevator.goToFloor(action[i].floor, true);
+                elevator.goingUpIndicator(action[i].indicator >= 0  );
+                elevator.goingDownIndicator(action[i].indicator <= 0);
             });
 
             return new Promise((resolve => {
@@ -321,12 +319,10 @@ var createWorldCreator = function() {
 
         // TODO fix for multiple elevators
         world.possibleActions = [];
-        for(let i = 0; i < options.floorCount ** options.elevatorCount; i++) {
-            let action = [];
-            for(let j = 0; j < options.elevatorCount; j++) {
-                action.push(i)
-            }
-            world.possibleActions.push(action);
+        for(let floor = 0; floor < options.floorCount; floor++) {
+            world.possibleActions.push([{ floor, indicator: 1 }]);
+            world.possibleActions.push([{ floor, indicator: 0 }]);
+            world.possibleActions.push([{ floor, indicator: -1 }]);
         }
 
         return world;
