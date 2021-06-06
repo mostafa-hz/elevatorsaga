@@ -270,7 +270,7 @@ var createWorldCreator = function() {
             let reward = 0;
 
             // transport more move less
-            reward += (moves * (-3 / options.floorCount));
+            reward += (moves * (-4 / options.floorCount));
 
             if(hasTransport) { // more passengers arrived, hooray!
                 reward += 5.0;
