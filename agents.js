@@ -14,7 +14,7 @@ const createRandomAgent = function() {
 
             while(!world.challengeEnded) {
                 const action = getRandomAction(world);
-                const { end } = await world.takeAction(world, action);
+                const { end } = await world.takeAction(action);
                 if(end) break;
             }
 
@@ -35,7 +35,7 @@ const createShabbatAgent = function() {
         play: async function(world) {
             while(!world.challengeEnded) {
                 const action = getNextAction(world);
-                const { end } = await world.takeAction(world, action);
+                const { end } = await world.takeAction(action);
                 if(end) break;
             }
         },
@@ -54,6 +54,8 @@ const createDeepAgent = async function(options, modelFiles) {
             // envState[`eMaxPassengerCount${i}`] = elevator.maxPassengerCount();
             envState[`e${i}_CF`] = elevator.currentFloor();
             envState[`e${i}_LF`] = elevator.loadFactor();
+            envState[`e${i}_IU`] = elevator.goingDownIndicator();
+            envState[`e${i}_ID`] = elevator.goingDownIndicator();
             let direction;
             switch(elevator.destinationDirection()) {
                 case 'up':
@@ -88,8 +90,9 @@ const createDeepAgent = async function(options, modelFiles) {
         const stateInput = Object.values(state);
         let actionInput = [];
         for(const a of action) {
+            actionInput.push(a.indicator);
             for(let f = 0; f < floorCount; f++) {
-                actionInput.push(f === a ? 1 : 0)
+                actionInput.push(f === a.floor ? 1 : 0)
             }
         }
         return [...stateInput, ...actionInput]
@@ -115,21 +118,19 @@ const createDeepAgent = async function(options, modelFiles) {
 
     async function loadModel() {
         const modelFile = Object.values(modelFiles).find(it => it.name.endsWith('.model.json'));
-        const weightsFile =  Object.values(modelFiles).find(it => it.name.endsWith('.model.weights.bin'));
+        const weightsFile = Object.values(modelFiles).find(it => it.name.endsWith('.model.weights.bin'));
         return tf.loadLayersModel(tf.io.browserFiles([modelFile, weightsFile]));
     }
 
     function buildModel() {
-        const statesSize = (floorCount * 2) + (elevatorCount * 3) + (floorCount * elevatorCount);
-        const actionSize = floorCount * elevatorCount;
+        const statesSize = (floorCount * 2) + (elevatorCount * 5) + (floorCount * elevatorCount);
+        const actionSize = (floorCount * elevatorCount) + elevatorCount;
         const inputSize = statesSize + actionSize;
         return tf.sequential({
             layers: [
-                tf.layers.dense({ inputShape: [inputSize], units: inputSize }),
+                tf.layers.dense({ inputShape: [inputSize], units: inputSize * 2 }),
                 tf.layers.leakyReLU(),
-                tf.layers.dense({ units: 27 }),
-                tf.layers.leakyReLU(),
-                tf.layers.dense({ units: 9 }),
+                tf.layers.dense({ units: inputSize }),
                 tf.layers.leakyReLU(),
                 tf.layers.dense({ units: 1 }),
             ]
@@ -139,9 +140,10 @@ const createDeepAgent = async function(options, modelFiles) {
     const model = modelFiles?.length === 2 ? await loadModel() : buildModel();
     model.compile({
         loss: tf.losses.meanSquaredError,
-        optimizer: tf.train.adam(0.3),
+        optimizer: tf.train.adam(0.01),
         metrics: ['accuracy'],
     });
+    model.summary();
 
     return {
         play: async function(world, exploreRate = 0) {
@@ -155,7 +157,7 @@ const createDeepAgent = async function(options, modelFiles) {
                 const observation = observe(world);
                 const explore = Math.random() < exploreRate;
                 const action = explore ? getRandomAction(world) : getBestAction(world, observation);
-                const { reward, end } = await world.takeAction(world, action);
+                const { reward, end } = await world.takeAction(action);
 
                 if(end) break;
 

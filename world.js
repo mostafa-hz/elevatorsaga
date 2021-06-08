@@ -222,9 +222,7 @@ var createWorldCreator = function() {
             transportedCounter: 0,
             loadFactor: 0,
             elevatorFloor: 0,
-            elevatorDirection: 0,
-            hasPassengerInDirection: false,
-            passengerWaitInDirection: false,
+            elevatorIndicator: 0,
         };
 
         function calculateReward(world) {
@@ -242,9 +240,7 @@ var createWorldCreator = function() {
                 transportedCounter: transportedCounterOld,
                 loadFactor: loadFactorOld,
                 elevatorFloor: elevatorFloorOld,
-                elevatorDirection: elevatorDirectionOld,
-                hasPassengerInDirection: hasPassengerInDirectionOld,
-                passengerWaitInDirection: passengerWaitInDirectionOld,
+                elevatorIndicator: elevatorIndicatorOld,
             } = oldWorld;
 
             const moves = moveCount - moveCountOld;
@@ -252,44 +248,34 @@ var createWorldCreator = function() {
             const hasTransport = transports > 0;
             const loadUser = loadFactor > loadFactorOld;
             const pressedButtons = world.floors.find(floor => floor.hasActiveButton());
-
             const elevatorDirection = Math.sign(elevatorFloor - elevatorFloorOld);
-            const hasPassengerInDirection = elevator.getPressedFloors().find(pressedFloor => elevatorDirection === Math.sign(pressedFloor - elevatorFloor));
-            const passengerWaitInDirection = world.floors.find(floor => floor.hasActiveButton() && elevatorDirection === Math.sign(floor.floorNum() - elevatorFloor));
-            const reverseDirection = elevatorDirection !== elevatorDirectionOld;
-
-            let reward = 0;
-
-            // transport more move less
-            reward += (moves * (-15 / options.floorCount));
-
-            if(hasTransport) { // more passengers arrived, hooray!
-                reward += 50;
-            } else if(loadUser) { // load more passengers
-                reward += 50;
-            }
-
-            if(hasPassengerInDirectionOld && reverseDirection) { // change direction without transporting all passengers
-                reward += -50;
-            }
-
-            if(passengerWaitInDirectionOld && reverseDirection) {  // change direction without loading all passengers
-                reward += -50;
-            }
+            const elevatorIndicator = (elevator.goingDownIndicator() * -1) + (elevator.goingUpIndicator() * 1);
 
             oldWorld = {
                 moveCount,
                 transportedCounter,
                 loadFactor,
                 elevatorFloor,
-                elevatorDirection,
-                hasPassengerInDirection,
-                passengerWaitInDirection,
+                elevatorIndicator,
             };
 
-            // no loading no transportation, passengers waiting on the elevator & other floors, wtf!
-            if(!(hasTransport || loadUser) && (pressedButtons || loadFactor > 0)) {
-                return -100
+            if(elevatorIndicatorOld !== 0 && elevatorDirection !== elevatorIndicatorOld) { // change the direction it meant to go
+                return -5.0;
+            }
+
+            if(!(hasTransport || loadUser) && (pressedButtons || loadFactor > 0)) {  // no loading no transportation, passengers waiting on the elevator & other floors, wtf!
+                return -5.0;
+            }
+
+            let reward = 0;
+
+            // transport more move less
+            reward += (moves * (-4 / options.floorCount));
+
+            if(hasTransport) { // more passengers arrived, hooray!
+                reward += 5.0;
+            } else if(loadUser) { // load more passengers
+                reward += 4.0;
             }
 
             return reward;
@@ -311,9 +297,13 @@ var createWorldCreator = function() {
             cb = undefined;
         });
 
-        world.takeAction = async function(world, action) {
+        world.takeAction = async function(action) {
             const elevators = world.elevatorInterfaces;
-            elevators.forEach((elevator, i) => elevator.goToFloor(action[i], true));
+            elevators.forEach((elevator, i) => {
+                elevator.goToFloor(action[i].floor, true);
+                elevator.goingUpIndicator(action[i].indicator >= 0  );
+                elevator.goingDownIndicator(action[i].indicator <= 0);
+            });
 
             return new Promise((resolve => {
                 cb = resolve;
@@ -329,12 +319,10 @@ var createWorldCreator = function() {
 
         // TODO fix for multiple elevators
         world.possibleActions = [];
-        for(let i = 0; i < options.floorCount ** options.elevatorCount; i++) {
-            let action = [];
-            for(let j = 0; j < options.elevatorCount; j++) {
-                action.push(i)
-            }
-            world.possibleActions.push(action);
+        for(let floor = 0; floor < options.floorCount; floor++) {
+            world.possibleActions.push([{ floor, indicator: 1 }]);
+            world.possibleActions.push([{ floor, indicator: 0 }]);
+            world.possibleActions.push([{ floor, indicator: -1 }]);
         }
 
         return world;
