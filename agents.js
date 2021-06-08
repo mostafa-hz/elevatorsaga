@@ -98,8 +98,8 @@ const createDeepAgent = async function(options, modelFiles) {
         return [...stateInput, ...actionInput]
     }
 
-    function getBestAction(world, state) {
-        const inputs = world.possibleActions.map(action => generateNetInput(state, action));
+    function getBestAction(possibleActions, state) {
+        const inputs = possibleActions.map(action => generateNetInput(state, action));
         const expectedRewards = model.predict(tf.tensor(inputs)).dataSync();
 
         let maxIndex = 0;
@@ -108,7 +108,7 @@ const createDeepAgent = async function(options, modelFiles) {
                 maxIndex = i;
             }
         });
-        return world.possibleActions[maxIndex]
+        return possibleActions[maxIndex]
     }
 
     function getRandomAction(world) {
@@ -147,7 +147,9 @@ const createDeepAgent = async function(options, modelFiles) {
 
     return {
         play: async function(world, exploreRate = 0) {
+            const { possibleActions } = world;
             const memory = {
+                possibleActions,
                 observations: [],
                 actions: [],
                 rewards: [],
@@ -156,7 +158,7 @@ const createDeepAgent = async function(options, modelFiles) {
             while(!world.challengeEnded) {
                 const observation = observe(world);
                 const explore = Math.random() < exploreRate;
-                const action = explore ? getRandomAction(world) : getBestAction(world, observation);
+                const action = explore ? getRandomAction(world) : getBestAction(possibleActions, observation);
                 const { reward, end } = await world.takeAction(action);
 
                 if(end) break;
@@ -170,14 +172,23 @@ const createDeepAgent = async function(options, modelFiles) {
         },
 
         train: async function(memory) {
+            const discount = 0.9;
             const {
+                possibleActions,
                 observations,
                 actions,
                 rewards,
             } = memory;
 
+            const nextRewards = observations.slice(1).map(state => {
+                const inputs = possibleActions.map(action => generateNetInput(state, action));
+                const expectedRewards = model.predict(tf.tensor(inputs)).dataSync().values();
+                return Math.max(...expectedRewards);
+            });
+            let targets = rewards.map((reward, i) => reward + (nextRewards[i] ?? 0) * discount);
+
             const netInputs = observations.map((state, i) => generateNetInput(observations[i], actions[i]));
-            await model.fit(tf.tensor(netInputs), tf.tensor(rewards));
+            await model.fit(tf.tensor(netInputs), tf.tensor(targets));
         },
 
         saveModel: async function(name) {
