@@ -5,20 +5,10 @@ const createRandomAgent = function() {
     }
 
     return {
-        play: async function(world) {
-            const memory = {
-                observations: [],
-                actions: [],
-                rewards: [],
-            };
-
-            while(!world.challengeEnded) {
-                const action = getRandomAction(world);
-                const { end } = await world.takeAction(action);
-                if(end) break;
-            }
-
-            return memory;
+        step: function(world) {
+            const observation = {};
+            const action = getRandomAction(world);
+            return { observation, action };
         },
     }
 };
@@ -32,12 +22,10 @@ const createShabbatAgent = function() {
     }
 
     return {
-        play: async function(world) {
-            while(!world.challengeEnded) {
-                const action = getNextAction(world);
-                const { end } = await world.takeAction(action);
-                if(end) break;
-            }
+        step: function(world) {
+            const observation = { lastIndex };
+            const action = getNextAction(world);
+            return getNextAction({ observation, action });
         },
     }
 };
@@ -79,8 +67,8 @@ const createDeepAgent = async function(options, modelFiles) {
         }
         for(let i = 0; i < floors.length; i++) {
             const floor = floors[i];
-            envState[`f${i}_PU`] = Number(floor.buttonStates.up === 'activated');
-            envState[`f${i}_PD`] = Number(floor.buttonStates.down === 'activated');
+            envState[`f${i}_PU`] = floor.buttonStates.up ? world.elapsedTime - floor.buttonStates.upElapsedTime : 0;
+            envState[`f${i}_PD`] = floor.buttonStates.down ? world.elapsedTime - floor.buttonStates.downElapsedTime : 0;
         }
 
         return envState;
@@ -146,29 +134,12 @@ const createDeepAgent = async function(options, modelFiles) {
     model.summary();
 
     return {
-        play: async function(world, exploreRate = 0) {
+        step: function(world, explore = false) {
             const { possibleActions } = world;
-            const memory = {
-                possibleActions,
-                observations: [],
-                actions: [],
-                rewards: [],
-            };
+            const observation = observe(world);
+            const action = explore ? getRandomAction(world) : getBestAction(possibleActions, observation);
 
-            while(!world.challengeEnded) {
-                const observation = observe(world);
-                const explore = Math.random() < exploreRate;
-                const action = explore ? getRandomAction(world) : getBestAction(possibleActions, observation);
-                const { reward, end } = await world.takeAction(action);
-
-                if(end) break;
-
-                memory.observations.push(observation);
-                memory.actions.push(action);
-                memory.rewards.push(reward);
-            }
-
-            return memory;
+            return { observation, action };
         },
 
         train: async function(memory) {
