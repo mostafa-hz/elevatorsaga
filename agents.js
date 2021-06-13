@@ -141,7 +141,7 @@ const createDeepAgent = async function(options, modelFiles) {
     model.compile({
         loss: tf.losses.meanSquaredError,
         optimizer: tf.train.adam(0.01),
-        metrics: ['accuracy'],
+        metrics: ['mse'],
     });
     model.summary();
 
