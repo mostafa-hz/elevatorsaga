@@ -323,6 +323,7 @@ $(function() {
         memory.actions = memory.actions.slice(0, memory.rewards.length);
 
         console.log({
+            exploreRate,
             transportedPerSec: world.transportedPerSec,
             avgWaitTime: world.avgWaitTime,
             maxWaitTime: world.maxWaitTime,

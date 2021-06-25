@@ -41,7 +41,7 @@ var createWorldCreator = function() {
     creator.spawnUserRandomly = function(floorCount, floorHeight, floors) {
         var user = creator.createRandomUser();
         user.moveTo(105 + _.random(40), 0);
-        var currentFloor = _.random(1) === 0 ? 0 : _.random(floorCount - 1);
+        var currentFloor = /*_.random(1) === 0 ? 0 :*/ _.random(floorCount - 1);
         var destinationFloor;
         if(currentFloor === 0) {
             // Definitely going up
@@ -327,7 +327,8 @@ var createWorldCreator = function() {
             return reward;
         }
 
-        world.takeAction = function(action) {
+        world.takeAction = function(actionIndex) {
+            const action = world.possibleActions[actionIndex];
             const elevators = world.elevatorInterfaces;
             elevators.forEach((elevator, i) => {
                 elevator.goToFloor(action[i].floor, true);

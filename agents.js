@@ -1,30 +1,34 @@
-const createRandomAgent = function() {
-    function getRandomAction(world) {
-        const randomIndex = Math.floor(Math.random() * world.possibleActions.length);
-        return world.possibleActions[randomIndex]
+const createRandomAgent = function(options) {
+    const { floorCount, elevatorCount } = options;
+    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+
+    function getRandomAction() {
+        return Math.floor(Math.random() * actionSize);
     }
 
     return {
         step: function(world) {
             const observation = {};
-            const action = getRandomAction(world);
+            const action = getRandomAction();
             return { observation, action };
         },
     }
 };
 
-const createShabbatAgent = function() {
+const createShabbatAgent = function(options) {
+    const { floorCount, elevatorCount } = options;
+    const actionSize = (floorCount * 3 - 4) * elevatorCount;
     let lastIndex = 0;
 
-    function getNextAction(world) {
-        lastIndex = (lastIndex + 1) % world.possibleActions.length;
-        return world.possibleActions[lastIndex];
+    function getNextAction() {
+        lastIndex = (lastIndex + 1) % actionSize;
+        return lastIndex;
     }
 
     return {
         step: function(world) {
             const observation = { lastIndex };
-            const action = getNextAction(world);
+            const action = getNextAction();
             return getNextAction({ observation, action });
         },
     }
@@ -32,6 +36,7 @@ const createShabbatAgent = function() {
 
 const createDeepAgent = async function(options, modelFiles) {
     const { floorCount, elevatorCount } = options;
+    const actionSize = (floorCount * 3 - 4) * elevatorCount;
 
     function observe(world) {
         const envState = {};
@@ -74,21 +79,13 @@ const createDeepAgent = async function(options, modelFiles) {
         return envState;
     }
 
-    function generateNetInput(state, action) {
-        const stateInput = Object.values(state);
-        let actionInput = [];
-        for(const a of action) {
-            actionInput.push(a.indicator);
-            for(let f = 0; f < floorCount; f++) {
-                actionInput.push(f === a.floor ? 1 : 0)
-            }
-        }
-        return [...stateInput, ...actionInput]
+    function generateNetInput(state) {
+        return Object.values(state);
     }
 
-    function getBestAction(possibleActions, state) {
-        const inputs = possibleActions.map(action => generateNetInput(state, action));
-        const expectedRewards = model.predict(tf.tensor(inputs)).dataSync();
+    function getBestAction(state) {
+        const input = generateNetInput(state);
+        const expectedRewards = model.predict(tf.tensor([input])).dataSync();
 
         let maxIndex = 0;
         expectedRewards.forEach((reward, i) => {
@@ -96,12 +93,11 @@ const createDeepAgent = async function(options, modelFiles) {
                 maxIndex = i;
             }
         });
-        return possibleActions[maxIndex]
+        return maxIndex;
     }
 
-    function getRandomAction(world) {
-        const randomIndex = Math.floor(Math.random() * world.possibleActions.length);
-        return world.possibleActions[randomIndex]
+    function getRandomAction() {
+        return Math.floor(Math.random() * actionSize);
     }
 
     async function loadModel() {
@@ -111,16 +107,14 @@ const createDeepAgent = async function(options, modelFiles) {
     }
 
     function buildModel() {
-        const statesSize = (floorCount * 2) + (elevatorCount * 5) + (floorCount * elevatorCount);
-        const actionSize = (floorCount * elevatorCount) + elevatorCount;
-        const inputSize = statesSize + actionSize;
+        const inputSize = (floorCount * 2) + (elevatorCount * 5) + (floorCount * elevatorCount);
         return tf.sequential({
             layers: [
                 tf.layers.dense({ inputShape: [inputSize], units: inputSize * 2 }),
                 tf.layers.leakyReLU(),
                 tf.layers.dense({ units: inputSize }),
                 tf.layers.leakyReLU(),
-                tf.layers.dense({ units: 1 }),
+                tf.layers.dense({ units: actionSize }),
             ]
         });
     }
@@ -135,9 +129,8 @@ const createDeepAgent = async function(options, modelFiles) {
 
     return {
         step: function(world, explore = false) {
-            const { possibleActions } = world;
             const observation = observe(world);
-            const action = explore ? getRandomAction(world) : getBestAction(possibleActions, observation);
+            const action = explore ? getRandomAction(world) : getBestAction(observation);
 
             return { observation, action };
         },
@@ -145,20 +138,20 @@ const createDeepAgent = async function(options, modelFiles) {
         train: async function(memory) {
             const discount = 0.9;
             const {
-                possibleActions,
                 observations,
                 actions,
                 rewards,
             } = memory;
 
-            const nextRewards = observations.slice(1).map(state => {
-                const inputs = possibleActions.map(action => generateNetInput(state, action));
-                const expectedRewards = model.predict(tf.tensor(inputs)).dataSync().values();
-                return Math.max(...expectedRewards);
+            const netInputs = observations.map(generateNetInput);
+            const expectedTargets = model.predict(tf.tensor(netInputs)).dataSync();
+            const targets = rewards.map((reward, i) => {
+                const nextTarget = expectedTargets.slice((i + 1) * actionSize, (i + 2) * actionSize);
+                const nextReward = nextTarget.length ? Math.max(...nextTarget) : 0;
+                nextTarget[actions[i]] = reward + nextReward * discount;
+                return nextTarget;
             });
-            let targets = rewards.map((reward, i) => reward + (nextRewards[i] ?? 0) * discount);
 
-            const netInputs = observations.map((state, i) => generateNetInput(observations[i], actions[i]));
             await model.fit(tf.tensor(netInputs), tf.tensor(targets));
         },
 
