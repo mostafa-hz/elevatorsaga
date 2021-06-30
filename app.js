@@ -187,7 +187,7 @@ $(function() {
                     presentFeedback($feedback, feedbackTempl, app.world, "Challenge failed", "Maybe your program needs an improvement?", "");
                 }
             }
-            const elevator = world.elevatorInterfaces[0];
+            const elevator = app.world.elevatorInterfaces[0];
             const idleElevator = elevator.destinationQueue.length === 0;
             if(idleElevator && !elevator.isBusy()) {
                 const { action } = app.agent.step(app.world);
@@ -276,9 +276,10 @@ $(function() {
         const challenge = challenges[app.currentChallengeIndex];
         let exploreRate = 1;
         while(train) {
-            const memory = runEpisode(challenge, codeObj, 1000.0 / 60.0, 12000, exploreRate);
+            const { memory, result } = runEpisode(challenge, codeObj, 1000.0 / 60.0, 12000, exploreRate);
+            console.log(result);
             await app.agent.train(memory);
-            if(exploreRate > 0.25) exploreRate -= 0.005;
+            if(exploreRate > 0.25) exploreRate -= 0.001;
             trainEpisode++;
             $('#p_train_count')[0].innerHTML = `${trainEpisode} episodes`;
         }
@@ -300,6 +301,7 @@ $(function() {
             rewards: [],
         };
 
+        let accReward = 0;
         for(let stepCount = 0; stepCount < stepsToSimulate && !controller.isPaused; stepCount++) {
             frameRequester.trigger();
             const elevator = world.elevatorInterfaces[0];
@@ -308,6 +310,7 @@ $(function() {
             if(stepCount > 0) {
                 const reward = world.calculateReward();
                 memory.rewards.push(reward);
+                accReward += reward;
             }
 
             const explore = exploreRate > Math.random();
@@ -322,14 +325,15 @@ $(function() {
         memory.observations = memory.observations.slice(0, memory.rewards.length);
         memory.actions = memory.actions.slice(0, memory.rewards.length);
 
-        console.log({
+        const result = {
             exploreRate,
             transportedPerSec: world.transportedPerSec,
             avgWaitTime: world.avgWaitTime,
             maxWaitTime: world.maxWaitTime,
             transportedCount: world.transportedCounter,
-        });
+            accReward,
+        };
 
-        return memory;
+        return { memory, result };
     }
 });
