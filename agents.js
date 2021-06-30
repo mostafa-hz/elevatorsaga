@@ -72,8 +72,8 @@ const createDeepAgent = async function(options, modelFiles) {
         }
         for(let i = 0; i < floors.length; i++) {
             const floor = floors[i];
-            envState[`f${i}_PU`] = floor.buttonStates.up ? world.elapsedTime - floor.buttonStates.upElapsedTime : 0;
-            envState[`f${i}_PD`] = floor.buttonStates.down ? world.elapsedTime - floor.buttonStates.downElapsedTime : 0;
+            envState[`f${i}_PU`] = floor.buttonStates.up ? world.elapsedTime - floor.buttonStates.upElapsedTime : -1;
+            envState[`f${i}_PD`] = floor.buttonStates.down ? world.elapsedTime - floor.buttonStates.downElapsedTime : -1;
         }
 
         return envState;
