@@ -146,7 +146,6 @@ $(function() {
     app.worldCreator = createWorldCreator();
     app.world = undefined;
     app.agent = undefined;
-    app.exploreRate = undefined;
 
     app.currentChallengeIndex = 0;
 
@@ -188,19 +187,17 @@ $(function() {
                     presentFeedback($feedback, feedbackTempl, app.world, "Challenge failed", "Maybe your program needs an improvement?", "");
                 }
             }
+            const elevator = app.world.elevatorInterfaces[0];
+            const idleElevator = elevator.destinationQueue.length === 0;
+            if(idleElevator && !elevator.isBusy()) {
+                const { action } = app.agent.step(app.world);
+                app.world.takeAction(action);
+            }
         });
 
         var codeObj = editor.getCodeObj();
         console.log("Starting...");
         app.worldController.start(app.world, codeObj, window.requestAnimationFrame, autoStart);
-        if(!app.agent) return;
-        app.agent.play(app.world, app.exploreRate).then(async memory => {
-            if(!app.train) return;
-            await app.agent.train(memory);
-            if(!autoStart) return;
-            if(app.exploreRate > 0.25) app.exploreRate -= 0.005;
-            app.startChallenge(challengeIndex, autoStart)
-        });
     };
 
     editor.on("apply_code", async function() {
@@ -215,12 +212,9 @@ $(function() {
                 break;
             case 'deep':
                 const fileInput = $("#file_import_model")[0];
-                app.train = $('#input_train')[0].checked;
-                app.exploreRate = app.train ? 1 : 0;
                 app.agent = await createDeepAgent(challenges[app.currentChallengeIndex].options, fileInput.files);
                 break;
         }
-        app.startChallenge(app.currentChallengeIndex, true);
     });
     editor.on("export_model", async function() {
         if(app.agent?.saveModel != null) {
@@ -262,4 +256,84 @@ $(function() {
         app.worldController.setTimeScale(timeScale);
         app.startChallenge(requestedChallenge, autoStart);
     });
+
+    let train = false;
+    let trainEpisode = 0;
+
+    $('#input_train').click(async function() {
+        train = !train;
+        $('#input_train')[0].innerHTML = train ? 'stop' : 'start';
+        if(train) trainModel();
+    });
+
+    async function trainModel() {
+        const codeObj = {
+            init() {
+            },
+            update() {
+            }
+        };
+        const challenge = challenges[app.currentChallengeIndex];
+        let exploreRate = 1;
+        while(train) {
+            const { memory, result } = runEpisode(challenge, codeObj, 1000.0 / 60.0, 12000, exploreRate);
+            console.log(result);
+            await app.agent.train(memory);
+            if(exploreRate > 0.25) exploreRate -= 0.001;
+            trainEpisode++;
+            $('#p_train_count')[0].innerHTML = `${trainEpisode} episodes`;
+        }
+    }
+
+    function runEpisode(challenge, codeObj, stepSize, stepsToSimulate, exploreRate) {
+        const controller = createWorldController(stepSize);
+
+        const worldCreator = createWorldCreator();
+        const world = worldCreator.createWorld(challenge.options);
+        const frameRequester = createFrameRequester(stepSize);
+
+        controller.start(world, codeObj, frameRequester.register, true);
+
+        const memory = {
+            possibleActions: world.possibleActions,
+            observations: [],
+            actions: [],
+            rewards: [],
+        };
+
+        let accReward = 0;
+        for(let stepCount = 0; stepCount < stepsToSimulate && !controller.isPaused; stepCount++) {
+            frameRequester.trigger();
+            const elevator = world.elevatorInterfaces[0];
+            const idleElevator = elevator.destinationQueue.length === 0;
+            if(!idleElevator || elevator.isBusy()) continue;
+            if(stepCount > 0) {
+                const reward = world.calculateReward();
+                memory.rewards.push(reward);
+                accReward += reward;
+            }
+
+            const explore = exploreRate > Math.random();
+            const { observation, action } = app.agent.step(world, explore);
+            world.takeAction(action);
+            memory.observations.push(observation);
+            memory.actions.push(action);
+        }
+        world.endChallenge();
+
+        // remove last step with no reward
+        memory.observations = memory.observations.slice(0, memory.rewards.length);
+        memory.actions = memory.actions.slice(0, memory.rewards.length);
+
+        const result = {
+            exploreRate,
+            transportedPerSec: world.transportedPerSec,
+            avgWaitTime: world.avgWaitTime,
+            maxWaitTime: world.maxWaitTime,
+            transportedCount: world.transportedCounter,
+            accReward,
+        };
+
+        return { memory, result };
+    }
 });
