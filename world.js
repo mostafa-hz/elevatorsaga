@@ -239,10 +239,7 @@ var createWorldCreator = function() {
         let oldWorld = {
             transportedUsers: [],
             loadedUsers: [],
-            waitingUsers: [],
-            onBoardUsers: [],
             moveCount: 0,
-            elevatorFloor: 0,
         };
 
         world.calculateReward = function() {
@@ -251,39 +248,27 @@ var createWorldCreator = function() {
             const {
                 transportedUsers,
                 loadedUsers,
-                waitingUsers,
                 moveCount,
             } = world;
             const loadFactor = elevator.loadFactor();
-            const maxCount = elevator.maxPassengerCount();
-            const elevatorFloor = elevator.currentFloor();
 
             const {
                 transportedUsers: transportedUsersOld,
-                loadFactor: loadFactorOld,
                 loadedUsers: loadedUsersOld,
-                waitingUsers: waitingUsersOld,
-                onBoardUsers: onBoardUsersOld,
                 moveCount: moveCountOld,
-                elevatorFloor: elevatorFloorOld,
             } = oldWorld;
 
             const moves = moveCount - moveCountOld;
             const newTransports = transportedUsers.slice(transportedUsersOld.length);
             const newLoads = loadedUsers.slice(loadedUsersOld.length);
             const hasTransport = newTransports.length > 0;
-            const loadUser = loadFactor > loadFactorOld;
             const hasLoads = newLoads.length > 0;
             const pressedButtons = world.floors.find(floor => floor.hasActiveButton());
 
             oldWorld = {
                 moveCount,
-                loadFactor,
                 transportedUsers: [...transportedUsers],
                 loadedUsers: [...loadedUsers],
-                onBoardUsers: Object.values(world.onBoardUsers),
-                waitingUsers: Object.values(world.waitingUsers),
-                elevatorFloor,
             };
 
             let reward = 0;
@@ -291,41 +276,30 @@ var createWorldCreator = function() {
             // duty
             reward += newTransports.length * 10;
 
+            // new loads
+            reward += newLoads.length * 5;
+
             // electricity cost
-            reward -= (moves * (10 / options.floorCount)) * loadFactor;
+            reward -= (moves * (10 / options.floorCount)) * (1 + loadFactor);
 
             // don't keep users wait on floors & elevator
             world.floors.forEach(floor => {
                 const { buttonStates } = floor;
                 if(buttonStates.up) {
-                    reward -= Math.log(world.elapsedTime - buttonStates.upElapsedTime + 1)
+                    reward -= Math.log(world.elapsedTime - buttonStates.upElapsedTime + 1) + 1
                 }
                 if(buttonStates.down) {
-                    reward -= Math.log(world.elapsedTime - buttonStates.downElapsedTime + 1)
+                    reward -= Math.log(world.elapsedTime - buttonStates.downElapsedTime + 1) + 1
                 }
             });
-            /*  const high = elevatorFloor > elevatorFloorOld ? elevatorFloor : elevatorFloorOld;
-              const low = elevatorFloor > elevatorFloorOld ? elevatorFloorOld : elevatorFloor;
-              Object.values(waitingUsersOld).forEach(user =>{
-                  const current =user.currentFloor;
-                  if(low < current && current < high){
-                      reward -= 10;
-                  }
-              });
-              Object.values(onBoardUsersOld).forEach(user => {
-                  const dest = user.destinationFloor;
-                  if(low < dest && dest < high){
-                      reward -= 20;
-                  }
-              });*/
 
             // no loading no transportation, passengers waiting on the elevator or other floors, wtf!
-            if(!(hasTransport || loadUser) && (pressedButtons || loadFactor > 0)) {
+            if(!(hasTransport || hasLoads) && (pressedButtons || loadFactor > 0)) {
                 reward -= 50.0;
             }
 
             return reward;
-        }
+        };
 
         world.takeAction = function(actionIndex) {
             const action = world.possibleActions[actionIndex];
