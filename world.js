@@ -318,9 +318,10 @@ var createWorldCreator = function() {
         // TODO fix for multiple elevators
         world.possibleActions = [];
         for(let floor = 0; floor < options.floorCount; floor++) {
-            if(floor !== options.floorCount - 1) world.possibleActions.push([{ floor, indicator: 1 }]);
-            if(floor !== 0 && floor !== options.floorCount - 1) world.possibleActions.push([{ floor, indicator: 0 }]);
-            if(floor !== 0) world.possibleActions.push([{ floor, indicator: -1 }]);
+            // if(floor !== options.floorCount - 1) world.possibleActions.push([{ floor, indicator: 1 }]);
+            // if(floor !== 0 && floor !== options.floorCount - 1) world.possibleActions.push([{ floor, indicator: 0 }]);
+            // if(floor !== 0) world.possibleActions.push([{ floor, indicator: -1 }]);
+            world.possibleActions.push([{ floor, indicator: 0 }]);
         }
 
         return world;

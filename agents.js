@@ -1,6 +1,6 @@
 const createRandomAgent = function(options) {
     const { floorCount, elevatorCount } = options;
-    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+    const actionSize = floorCount;
 
     function getRandomAction() {
         return Math.floor(Math.random() * actionSize);
@@ -17,7 +17,7 @@ const createRandomAgent = function(options) {
 
 const createShabbatAgent = function(options) {
     const { floorCount, elevatorCount } = options;
-    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+    const actionSize = floorCount;
     let lastIndex = 0;
 
     function getNextAction() {
@@ -36,7 +36,7 @@ const createShabbatAgent = function(options) {
 
 const createDeepAgent = async function(options, modelFiles) {
     const { floorCount, elevatorCount } = options;
-    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+    const actionSize = floorCount;
 
     function observe(world) {
         const envState = {};
