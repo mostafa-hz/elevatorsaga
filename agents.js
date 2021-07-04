@@ -1,6 +1,6 @@
 const createRandomAgent = function(options) {
     const { floorCount, elevatorCount } = options;
-    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+    const actionSize = floorCount;
 
     function getRandomAction() {
         return Math.floor(Math.random() * actionSize);
@@ -17,7 +17,7 @@ const createRandomAgent = function(options) {
 
 const createShabbatAgent = function(options) {
     const { floorCount, elevatorCount } = options;
-    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+    const actionSize = floorCount;
     let lastIndex = 0;
 
     function getNextAction() {
@@ -36,7 +36,7 @@ const createShabbatAgent = function(options) {
 
 const createDeepAgent = async function(options, modelFiles) {
     const { floorCount, elevatorCount } = options;
-    const actionSize = (floorCount * 3 - 4) * elevatorCount;
+    const actionSize = floorCount;
 
     function observe(world) {
         const envState = {};
@@ -72,8 +72,8 @@ const createDeepAgent = async function(options, modelFiles) {
         }
         for(let i = 0; i < floors.length; i++) {
             const floor = floors[i];
-            envState[`f${i}_PU`] = floor.buttonStates.up ? world.elapsedTime - floor.buttonStates.upElapsedTime : -1;
-            envState[`f${i}_PD`] = floor.buttonStates.down ? world.elapsedTime - floor.buttonStates.downElapsedTime : -1;
+            envState[`f${i}_PU`] = floor.buttonStates.up ? world.elapsedTime - floor.buttonStates.upElapsedTime : -5;
+            envState[`f${i}_PD`] = floor.buttonStates.down ? world.elapsedTime - floor.buttonStates.downElapsedTime : -5;
         }
 
         return envState;
@@ -127,6 +127,9 @@ const createDeepAgent = async function(options, modelFiles) {
     });
     model.summary();
 
+    let trainModel;
+    let trainCount = 0;
+
     return {
         step: function(world, explore = false) {
             const observation = observe(world);
@@ -136,6 +139,11 @@ const createDeepAgent = async function(options, modelFiles) {
         },
 
         train: async function(memory) {
+            if(trainModel == null) {
+                trainModel = modelFiles?.length === 2 ? await loadModel() : buildModel();
+                trainModel.setWeights(model.getWeights());
+            }
+
             const discount = 0.9;
             const {
                 observations,
@@ -144,7 +152,7 @@ const createDeepAgent = async function(options, modelFiles) {
             } = memory;
 
             const netInputs = observations.map(generateNetInput);
-            const expectedTargets = model.predict(tf.tensor(netInputs)).dataSync();
+            const expectedTargets = trainModel.predict(tf.tensor(netInputs)).dataSync();
             const targets = rewards.map((reward, i) => {
                 const nextTarget = expectedTargets.slice((i + 1) * actionSize, (i + 2) * actionSize);
                 const nextReward = nextTarget.length ? Math.max(...nextTarget) : 0;
@@ -153,6 +161,11 @@ const createDeepAgent = async function(options, modelFiles) {
             });
 
             await model.fit(tf.tensor(netInputs), tf.tensor(targets));
+
+            if(trainCount % 10 === 0){
+                trainModel.setWeights(model.getWeights());
+            }
+            trainCount++;
         },
 
         saveModel: async function(name) {
