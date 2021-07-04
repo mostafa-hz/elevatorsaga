@@ -127,6 +127,9 @@ const createDeepAgent = async function(options, modelFiles) {
     });
     model.summary();
 
+    let trainModel;
+    let trainCount = 0;
+
     return {
         step: function(world, explore = false) {
             const observation = observe(world);
@@ -136,6 +139,11 @@ const createDeepAgent = async function(options, modelFiles) {
         },
 
         train: async function(memory) {
+            if(trainModel == null) {
+                trainModel = modelFiles?.length === 2 ? await loadModel() : buildModel();
+                trainModel.setWeights(model.getWeights());
+            }
+
             const discount = 0.9;
             const {
                 observations,
@@ -144,7 +152,7 @@ const createDeepAgent = async function(options, modelFiles) {
             } = memory;
 
             const netInputs = observations.map(generateNetInput);
-            const expectedTargets = model.predict(tf.tensor(netInputs)).dataSync();
+            const expectedTargets = trainModel.predict(tf.tensor(netInputs)).dataSync();
             const targets = rewards.map((reward, i) => {
                 const nextTarget = expectedTargets.slice((i + 1) * actionSize, (i + 2) * actionSize);
                 const nextReward = nextTarget.length ? Math.max(...nextTarget) : 0;
@@ -153,6 +161,11 @@ const createDeepAgent = async function(options, modelFiles) {
             });
 
             await model.fit(tf.tensor(netInputs), tf.tensor(targets));
+
+            if(trainCount % 10 === 0){
+                trainModel.setWeights(model.getWeights());
+            }
+            trainCount++;
         },
 
         saveModel: async function(name) {
