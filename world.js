@@ -77,8 +77,6 @@ var createWorldCreator = function() {
         world.users = [];
         world.loadedUsers = [];
         world.transportedUsers = [];
-        world.onBoardUsers = {};
-        world.waitingUsers = {};
         world.transportedCounter = 0;
         world.transportedPerSec = 0.0;
         world.moveCount = 0;
@@ -100,20 +98,17 @@ var createWorldCreator = function() {
             world.users.push(user);
             user.updateDisplayPosition(true);
             user.spawnTimestamp = world.elapsedTime;
-            user.id = world.users.length;
-            world.waitingUsers[user.id] = user;
+            user.isLoaded = false;
             world.trigger("new_user", user);
             user.on("entered_elevator", function() {
                 world.loadedUsers.push(user);
-                delete world.waitingUsers[user.id];
-                world.onBoardUsers[user.id] = user
+                user.isLoaded = true;
             });
             user.on("exited_elevator", function() {
                 user.exitTime = world.elapsedTime;
                 world.transportedCounter++;
                 world.maxWaitTime = Math.max(world.maxWaitTime, world.elapsedTime - user.spawnTimestamp);
                 world.avgWaitTime = (world.avgWaitTime * (world.transportedCounter - 1) + (world.elapsedTime - user.spawnTimestamp)) / world.transportedCounter;
-                delete world.onBoardUsers[user.id];
                 world.transportedUsers.push(user);
                 recalculateStats();
             });
@@ -240,6 +235,9 @@ var createWorldCreator = function() {
             transportedUsers: [],
             loadedUsers: [],
             moveCount: 0,
+            elevatorFloor: 0,
+            loadFactor: 0,
+            targetFloor: 0,
         };
 
         world.calculateReward = function() {
@@ -250,12 +248,16 @@ var createWorldCreator = function() {
                 loadedUsers,
                 moveCount,
             } = world;
+            const elevatorFloor = elevator.currentFloor();
             const loadFactor = elevator.loadFactor();
 
             const {
                 transportedUsers: transportedUsersOld,
                 loadedUsers: loadedUsersOld,
                 moveCount: moveCountOld,
+                elevatorFloor: elevatorFloorOld,
+                loadFactor: loadFactorOld,
+                targetFloor: targetFloorOld,
             } = oldWorld;
 
             const moves = moveCount - moveCountOld;
@@ -264,38 +266,45 @@ var createWorldCreator = function() {
             const hasTransport = newTransports.length > 0;
             const hasLoads = newLoads.length > 0;
             const pressedButtons = world.floors.find(floor => floor.hasActiveButton());
+            const targetUser = world.users.reduce((pre, curr) => {
+                if(curr.exitTime != null) return pre;
+                if(pre == null) return curr;
+                return pre.spawnTimestamp < curr.spawnTimestamp ? pre : curr
+            }, undefined);
+            const targetFloor = targetUser?.isLoaded ? targetUser.destinationFloor : targetUser?.currentFloor ?? elevatorFloor;
 
             oldWorld = {
                 moveCount,
                 transportedUsers: [...transportedUsers],
                 loadedUsers: [...loadedUsers],
+                elevatorFloor,
+                loadFactor,
+                targetFloor,
             };
 
             let reward = 0;
 
             // duty
-            reward += newTransports.length * 10;
+            reward += newTransports.length ? 5 : 0;
 
             // new loads
-            reward += newLoads.length * 5;
+            reward += newLoads.length ? 5 : 0;
 
             // electricity cost
-            reward -= (moves * (10 / options.floorCount)) * (1 + loadFactor);
+            reward -= moves * (1 + loadFactorOld);
 
-            // don't keep users wait on floors & elevator
-            world.floors.forEach(floor => {
-                const { buttonStates } = floor;
-                if(buttonStates.up) {
-                    reward -= Math.log(world.elapsedTime - buttonStates.upElapsedTime + 1) + 1
-                }
-                if(buttonStates.down) {
-                    reward -= Math.log(world.elapsedTime - buttonStates.downElapsedTime + 1) + 1
-                }
-            });
+            // first-in first-out while serving other in same direction
+            const approachTargetFloor = Math.abs(targetFloorOld - elevatorFloor) <= Math.abs(targetFloorOld - elevatorFloorOld);
+            const lowFloor = elevatorFloor < elevatorFloorOld ? elevatorFloor : elevatorFloorOld;
+            const highFloor = elevatorFloor > elevatorFloorOld ? elevatorFloor : elevatorFloorOld;
+            const passTargetFloor = targetFloorOld > lowFloor && targetFloorOld < highFloor;
+            if(passTargetFloor || !approachTargetFloor) {
+                reward -= 10;
+            }
 
             // no loading no transportation, passengers waiting on the elevator or other floors, wtf!
             if(!(hasTransport || hasLoads) && (pressedButtons || loadFactor > 0)) {
-                reward -= 50.0;
+                reward -= 10.0;
             }
 
             return reward;
