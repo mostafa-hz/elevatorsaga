@@ -275,11 +275,13 @@ $(function() {
         };
         const challenge = challenges[app.currentChallengeIndex];
         let exploreRate = 1;
+        const exploreMin = 0.02;
+        const exploreDecay = 0.998;
         while(train) {
             const { memory, result } = runEpisode(challenge, codeObj, 1000.0 / 60.0, 12000, exploreRate);
             console.log(result);
             await app.agent.train(memory);
-            if(exploreRate > 0.25) exploreRate -= 0.001;
+            if(exploreRate > exploreMin) exploreRate *= exploreDecay;
             trainEpisode++;
             $('#p_train_count')[0].innerHTML = `${trainEpisode} episodes`;
         }
